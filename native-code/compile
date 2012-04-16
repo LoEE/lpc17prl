@@ -1,0 +1,19 @@
+#!/bin/zsh
+families=(lpc13xx lpc17xx)
+
+dump () {
+  arm-none-eabi-objcopy -O binary -j .text.$1 dbg.o $1.bin
+}
+
+compile () {
+  cflags=(-Os -mcpu=cortex-m3 -mthumb -ffunction-sections --std=gnu99)
+  arm-none-eabi-gcc $cflags -c -o dbg.o dbg.c
+  dump map_normal
+  dump map_boot
+  dump baud_max
+  rm -f dbg.o
+}
+
+for dir in $families; do
+  (cd $dir && rm -f *.bin(N) && compile)
+done

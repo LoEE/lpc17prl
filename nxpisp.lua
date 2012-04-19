@@ -62,7 +62,7 @@ function NXPisp.disconnect (self)
 end
 
 function NXPisp.reset (self, bootloader)
-  D.blue('÷'..(bootloader and 'boot' or '')..'reset')()
+  D.blue('÷ reset, run '..(bootloader and 'bootloader' or 'user code'))()
   if bootloader then bootloader = '0' else bootloader = '1' end
   local reset1, boot, reset2 = self:gpio{
     '0', RESET, 'd', 20,
@@ -320,6 +320,7 @@ function NXPisp.write_sector (self, image, sector)
   local freeram = self.part:free_ram_start()
   for bs,be in B.allslices (s, e, bsize) do
     local block = string.sub(image, bs+1, be+1)
+    if #block % 4 ~= 0 then block = block .. string.rep('\0', 4 - #block % 4) end
     if not block_empty(block) then
       D('.','nonl')()
       self:write_to_ram (freeram, block)

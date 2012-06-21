@@ -41,8 +41,9 @@ local options = {
 function options.callback (s)
   isp = NXPisp:new(s)
   isp.verbose = 1
-  repl.agent:handle(s:mbox'uart', function (data)
-    D.green'«'(D.unq(B.bin2hex(data)))
+  repl.agent:handle(s:mbox'uart1', function (data)
+    --D.green'«'(D.unq(B.bin2hex(data)))
+    D.green'«'(data)
   end)
   repl.ns.isp = isp
   repl.ns.s = s

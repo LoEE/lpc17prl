@@ -7,7 +7,7 @@ local buffer = require'buffer'
 
 
 local NXPisp = Object:inherit{
-  uart = 'uart',
+  uart = 'uart1',
   cclk = 12000,
   verbose = 0,
 }

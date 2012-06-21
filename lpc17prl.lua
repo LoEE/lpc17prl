@@ -35,7 +35,7 @@ end
 
 local options = {
   product = "SEPACK-NXP",
-  verbose = 2,
+  verbose = 1,
   serial = nil,
 }
 function options.callback (s)

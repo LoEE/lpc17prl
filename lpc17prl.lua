@@ -35,13 +35,13 @@ end
 
 local options = {
   product = "SEPACK-NXP",
-  verbose = 1,
+  verbose = 2,
   serial = nil,
 }
 function options.callback (s)
   isp = NXPisp:new(s)
   isp.verbose = 1
-  repl.agent:handle(s:mbox'uart1', function (data)
+  repl.agent:handle(s:mbox'uart', function (data)
     D.green'«'(D.unq(B.bin2hex(data)))
   end)
   repl.ns.isp = isp

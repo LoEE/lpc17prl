@@ -7,7 +7,7 @@ local buffer = require'buffer'
 
 
 local NXPisp = Object:inherit{
-  uart = 'uart1',
+  uart = 'uart',
   cclk = 12000,
   verbose = 0,
 }
@@ -43,12 +43,12 @@ function NXPisp.connect (self)
     'O', BOOT,  '0', BOOT,
     '1', LEDY, '1', LEDG,
     'd', 0,
-    'I', RESET, 'r', RESET, 'O', RESET,
-    'I', BOOT, 'r', BOOT, 'O', BOOT,
+    --'I', RESET, 'r', RESET, 'O', RESET,
+    --'I', BOOT, 'r', BOOT, 'O', BOOT,
     'P', TxD, 'P', RxD,
   }
-  assert (reset == 0, 'could not force RESET to 0')
-  assert (boot == 0, 'could not force BOOT to 0')
+  --assert (reset == 0, 'could not force RESET to 0')
+  --assert (boot == 0, 'could not force BOOT to 0')
   self:setup_uart(115200)
 end
 
@@ -66,15 +66,15 @@ function NXPisp.reset (self, bootloader)
   if bootloader then bootloader = '0' else bootloader = '1' end
   local reset1, boot, reset2 = self:gpio{
     '0', RESET, 'd', 20,
-    'I', RESET, 'r', RESET, 'O', RESET,
+    --'I', RESET, 'r', RESET, 'O', RESET,
     bootloader, BOOT, 'd', 20,
-    'I', BOOT, 'r', BOOT, 'O', BOOT,
+    --'I', BOOT, 'r', BOOT, 'O', BOOT,
     '1', RESET, 'd', 1, 
-    'I', RESET, 'r', RESET, 'O', RESET,
+    --'I', RESET, 'r', RESET, 'O', RESET,
   }
-  assert (reset1 == 0, 'could not force RESET to 0')
-  assert (tostring(boot) == bootloader, 'could not force BOOT to '..bootloader)
-  assert (reset2 == 1, 'could not force RESET to 1')
+  --assert (reset1 == 0, 'could not force RESET to 0')
+  --assert (tostring(boot) == bootloader, 'could not force BOOT to '..bootloader)
+  --assert (reset2 == 1, 'could not force RESET to 1')
 end
 
 
@@ -116,7 +116,7 @@ end
 function NXPisp.expect (self, ex, err)
   local d = self:rdln()
   if d ~= ex then
-    msg = string.format('got %q, expected %q', d, ex)
+    local msg = string.format('got %q, expected %q', d, ex)
     if err then msg = err .. ': ' .. msg end
     error(msg, 2)
   end
@@ -161,7 +161,7 @@ function NXPisp.uusend (self, data, s, e)
 end
 
 function NXPisp.uurecv (self, s, e)
-  data = {}
+  local data = {}
   for bs,be in B.allslices (s, e, NXPisp.uu_block_size) do
     local sum = 0
     local lines = {}
@@ -292,7 +292,7 @@ function NXPisp.copy_ram_to_flash (self, dest, s, e)
   if len ~= 256 and len ~= 512 and len ~= 1024 and len ~= 4096 then
     error("length is not 256, 512, 1024 or 4096", 2)
   end
-  self:prepare_sectors(dest, len)
+  self:prepare_sectors(dest, dest+len-1)
   self:cmd(string.format("C %d %d %d", dest, s, len))
 end
 

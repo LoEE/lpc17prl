@@ -19,7 +19,7 @@ end
 
 local function decode1 (b)
   b = b - 32
-  if b < 0 or b > 64 then error(string.format('invalid input character in position %d: %d', i, b + 32), 2) end
+  if b < 0 or b > 64 then error(string.format('invalid input character: %d', b + 32), 2) end
   if b == 64 then b = 0 end
   return b
 end
@@ -48,7 +48,7 @@ local function encode_line (str, s, e, padding)
 end
 
 local function decode_line (str)
-  local len = decode1(string.byte(str, 1, 1)) 
+  local len = decode1(string.byte(str, 1, 1))
   o = {}
   for i=2,#str,4 do
     o[#o+1] = decode3 (str, i)

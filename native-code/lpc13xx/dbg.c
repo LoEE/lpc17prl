@@ -19,7 +19,6 @@ void map_boot () {
 #define U0FDR U0REG(0x28)
 #define SYSAHBCLKDIV (*(volatile unsigned int *)(0x40048078))
 #define UARTCLKDIV (*(volatile unsigned int *)(0x40048098))
-#define MAINCLKSEL (*(volatile unsigned int *)(0x40048070))
 
 void baud_max () {
   while (!(U0LSR & (1 << 6)));
@@ -28,7 +27,7 @@ void baud_max () {
   U0FDR = (1 << 4) | 0; // disable fractional
   U0LCR |= 1 << 7; // DLAB = 1
   U0DLM = 0;
-  U0DLL = 3; // 12e6 / 16 / 3 = 250000
+  U0DLL = 1; // 12e6 / 16 / 1 = 750000
   U0LCR &= ~(1 << 7); // DLAB = 0
   U0FCR = 0x7; // reset fifos*/
 }

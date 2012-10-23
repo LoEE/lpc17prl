@@ -1,12 +1,21 @@
 #!/bin/zsh
-families=(lpc13xx lpc17xx)
+set -e
+
+families=(lpc122x lpc13xx lpc17xx)
 
 dump () {
   arm-none-eabi-objcopy -O binary -j .text.$1 dbg.o $1.bin
 }
 
 compile () {
-  cflags=(-Os -mcpu=cortex-m3 -mthumb -ffunction-sections --std=gnu99)
+  cd $dir
+  rm -f *.bin(N)
+  cflags=(-Os -mthumb -ffunction-sections --std=gnu99)
+  if [[ $dir == lpc12* ]]; then
+    cflags=(-mcpu=cortex-m0 $cflags)
+  else
+    cflags=(-mcpu=cortex-m3 $cflags)
+  fi
   arm-none-eabi-gcc $cflags -c -o dbg.o dbg.c
   dump map_normal
   dump map_boot
@@ -14,6 +23,4 @@ compile () {
   rm -f dbg.o
 }
 
-for dir in $families; do
-  (cd $dir && rm -f *.bin(N) && compile)
-done
+for dir in $families; do (compile); done

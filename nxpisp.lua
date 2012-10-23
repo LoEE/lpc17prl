@@ -7,9 +7,11 @@ local buffer = require'buffer'
 
 
 local NXPisp = Object:inherit{
-  uart = 'uart1',
+  uart = 'uart',
   cclk = 12000,
-  verbose = 0,
+  verbose = 1,
+  use_maxbaud = true,
+  use_bootpin = true,
 }
 
 local LEDG  = 0x12
@@ -37,10 +39,16 @@ function NXPisp.setup_uart (self, ...)
 end
 
 function NXPisp.connect (self)
-  D.blue'÷ connect'()
+  if self.verbose > 0 then D.blue'÷ connected'() end
+  local bootpin
+  if self.use_bootpin then
+    bootpin = { 'O', BOOT,  '0', BOOT, }
+  else
+    bootpin = {}
+  end
   local reset, boot = self:gpio{
     'O', RESET, '0', RESET,
-    'O', BOOT,  '0', BOOT,
+    bootpin,
     '1', LEDY, '1', LEDG,
     'd', 0,
     --'I', RESET, 'r', RESET, 'O', RESET,
@@ -53,7 +61,7 @@ function NXPisp.connect (self)
 end
 
 function NXPisp.disconnect (self)
-  D.blue'÷ disconnect'()
+  if self.verbose > 0 then D.blue'÷ disconnected'() end
   self:gpio{
     'S', 'z', 'I', BOOT, 'd', 10, 'I', RESET,
     'S', 'u', 'I', TxD,
@@ -62,14 +70,14 @@ function NXPisp.disconnect (self)
 end
 
 function NXPisp.reset (self, bootloader)
-  D.blue('÷ reset, run '..(bootloader and 'bootloader' or 'user code'))()
+  if self.verbose > 0 then D.blue('÷ reset, running '..(bootloader and 'bootloader' or 'user code'))() end
   if bootloader then bootloader = '0' else bootloader = '1' end
   local reset1, boot, reset2 = self:gpio{
     '0', RESET, 'd', 20,
     --'I', RESET, 'r', RESET, 'O', RESET,
     bootloader, BOOT, 'd', 20,
     --'I', BOOT, 'r', BOOT, 'O', BOOT,
-    '1', RESET, 'd', 1, 
+    '1', RESET, 'd', 1,
     --'I', RESET, 'r', RESET, 'O', RESET,
   }
   --assert (reset1 == 0, 'could not force RESET to 0')
@@ -82,7 +90,7 @@ end
 -- Line based protocol
 --
 function NXPisp.wr (self, data)
-  if (self.verbose > 0) then D.blue'»'(data) end
+  if self.verbose > 1 then D.blue'»'(data) end
   self.sepack:write(self.uart, data)
 end
 
@@ -97,17 +105,17 @@ end
 
 function NXPisp.rdln (self, ending)
   ending = ending or '\r\n'
-  local uart1 = self.sepack:mbox(self.uart)
+  local uart = self.sepack:mbox(self.uart)
   while true do
     local line = self.readbuf:readuntil(ending, #ending)
     if line then
       local rest = self.readbuf:read()
-      if rest then uart1:putback(rest) end
-      if self.verbose > 0 then D.cyan'«'(line .. ending) end
+      if rest then uart:putback(rest) end
+      if self.verbose > 1 then D.cyan'«'(line .. ending) end
       return line
     end
     T.recv{
-      [uart1] = function (d) self.readbuf:write (d) end,
+      [uart] = function (d) self.readbuf:write (d) end,
       [T.Timeout:new(2)] = function () error ('read timeout', 5) end,
     }
   end
@@ -115,9 +123,10 @@ end
 
 function NXPisp.expect (self, ex, err)
   local d = self:rdln()
-  if d ~= ex then
+  local s,e = string.find(d, ex)
+  if s ~= 1 or e ~= #d then
     local msg = string.format('got %q, expected %q', d, ex)
-    if err then msg = err .. ': ' .. msg end
+    if err then msg = err..': '..msg end
     error(msg, 2)
   end
 end
@@ -188,7 +197,7 @@ end
 --
 function NXPisp.synchronize (self)
   self:wr'?'
-  self:expect'Synchronized'
+  self:expect'.*Synchronized'
   self:wrln'Synchronized'
   self:expect'OK'
   self:wrln(self.cclk)
@@ -246,30 +255,31 @@ function NXPisp.unlock (self)
   self:cmd'U 23130'
 end
 
-function NXPisp.prepare_sectors (self, s, e)
+function NXPisp.prepare_region (self, s, e)
   s = self.part:addr2sector(s)
   e = self.part:addr2sector(e)
   if e == 0 then e = 1 end -- workaround for a silicon/ROM bug (it is impossible to erase only sector 0)
   self:cmd(string.format("P %d %d", s, e))
 end
 
-function NXPisp.erase_sectors (self, s, e)
-  self:prepare_sectors(s, e)
+function NXPisp.erase_region (self, s, e)
+  self:prepare_region(s, e)
   s = self.part:addr2sector(s)
   e = self.part:addr2sector(e)
   if e == 0 then e = 1 end -- workaround for a silicon/ROM bug (it is impossible to erase only sector 0)
   self:cmd(string.format("E %d %d", s, e))
 end
 
-function NXPisp.sector_blank_check (self, first, last)
-  local status = self:cmd(string.format("I %d %d", first, last), true)
+function NXPisp.blank_check_region (self, s, e)
+  s = self.part:addr2sector(s)
+  e = self.part:addr2sector(e)
+  local status = self:cmd(string.format("I %d %d", s, e), true)
   if status == 'CMD_SUCCESS' then
     return true
   elseif status == 'SECTOR_NOT_BLANK' then
     local addr = tonumber(self:rdln())
     local val  = tonumber(self:rdln())
-    D(string.format('found a non-blank value: %02x at: %08x', addr, val))()
-    return false
+    return nil, addr, val
   else
     error ('isp error: ' .. status, 2)
   end
@@ -292,7 +302,7 @@ function NXPisp.copy_ram_to_flash (self, dest, s, e)
   if len ~= 256 and len ~= 512 and len ~= 1024 and len ~= 4096 then
     error("length is not 256, 512, 1024 or 4096", 2)
   end
-  self:prepare_sectors(dest, dest+len-1)
+  self:prepare_region(dest, dest+len-1)
   self:cmd(string.format("C %d %d %d", dest, s, len))
 end
 
@@ -335,18 +345,36 @@ end
 --
 function NXPisp.run_code (self, name)
   local temp_addr = self.part:free_ram_start()
-  local code = assert(io.open (_G.program_path .. 'native-code/' ..  self.part.family .. '/' .. name .. '.bin', 'rb'), "unable to load native code: " .. name):read('*a')
+  local path = os.program_path .. '/native-code/' ..  self.part.family .. '/' .. name .. '.bin'
+  local f, err = io.open (path, 'rb')
+  if not f then error(path..": unable to load native code: "..err, 0) end
+  local code = f:read('*a')
+  f:close()
+  if self.verbose > 1 then D.blue'÷ running code:'(D.unq(string.format('%s (%d bytes loaded at 0x%08x)', name, #code, temp_addr))) end
+  if self.verbose > 2 then D.cyan''(D.hex(code)) end
   self:write_to_ram (temp_addr, code)
   self:run (temp_addr)
 end
 
 function NXPisp.disable_boot_memory_map (self)
-  self:run_code'map_boot'
+  self:run_code'map_normal'
 end
 
 function NXPisp.set_max_baudrate (self)
   self:run_code'baud_max'
-  self:setup_uart(250000)
+  self:setup_uart(750000)
+end
+
+function NXPisp.read_flash (self)
+  return self:read_memory(0, self.part.flash * 1024 - 1)
+end
+
+function NXPisp.blank_check (self)
+  return self:blank_check_region(0, self.part.flash * 1024 - 1)
+end
+
+function NXPisp.erase (self)
+  self:erase_region(0, self.part.flash * 1024 - 1)
 end
 
 function NXPisp.burn (self, dest, image)
@@ -354,13 +382,11 @@ function NXPisp.burn (self, dest, image)
   if dest + len > self.part.flash * 1024 then
     error(string.format ("image to large for this device (%d bytes)", dest+len), 2)
   end
+  self:erase_region(0, dest + len - 1)
   local last_sector = self.part:addr2sector(dest + len)
-  self:erase_sectors(0, last_sector)
-  ---[[
   for sector=1,last_sector do self:write_sector (image, sector) end
   self:write_sector (image, 0)
   D''()
-  --]]
 end
 
 function NXPisp.start (self)
@@ -370,16 +396,19 @@ function NXPisp.start (self)
     self:reset(true)
     ok, err = T.pcall(function () self:synchronize() end)
     if ok then break end
+    if self.verbose > 0 then D.red('synchronization failed: '..err)() end
   end
-  if not ok then error (err) end
+  if not ok then error('synchronization failed: giving up after 10 retries') end
   local part_id = self:read_part_id()
-  self.part = self.devices[part_id]
-  if not self.part then
+  local part = self.devices[part_id]
+  if not part then
     error("unknown part id: " .. part_id)
   end
+  if self.verbose > 0 then D.green('Found '..part.name..' with '..part.flash .. 'kB flash and '..part.ram..'kB RAM in '..part.package)() end
+  self.part = part
   self:unlock()
   self:disable_boot_memory_map()
-  self:set_max_baudrate()
+  if self.use_maxbaud then self:set_max_baudrate() end
 end
 
 function NXPisp.stop (self)

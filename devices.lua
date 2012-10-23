@@ -3,7 +3,7 @@ local Object = require'oo'
 local NXPpart = Object:inherit{}
 
 function NXPpart.bootloader_ram (self)
-  if self.family == 'lpc13xx' then
+  if self.family == 'lpc13xx' or self.family == 'lpc122x' then
     return 0x260
   elseif self.family == 'lpc17xx' then
     return 0x200
@@ -17,11 +17,12 @@ function NXPpart.free_ram_start (self)
 end
 
 function NXPpart.free_ram_size (self)
-  return self.main_ram * 1024 - self:bootloader_ram()
+  -- stack = 256, IAP = 32
+  return self.main_ram * 1024 - self:bootloader_ram() - 256 - 32
 end
 
 function NXPpart.sector_size (self, s)
-  if s < 16 then
+  if s < 16 or self.family == 'lpc122x' then
     return 4*1024
   else
     return 32*1024
@@ -29,7 +30,7 @@ function NXPpart.sector_size (self, s)
 end
 
 function NXPpart.sector_start_addr (self, s)
-  if s < 16 then
+  if s < 16 or self.family == 'lpc122x' then
     return s * 4*1024
   else
     return 16 * 4*1024 + (s - 16) * 32*1024
@@ -38,7 +39,7 @@ end
 
 function NXPpart.addr2sector (self, addr)
   local sector = math.floor(addr / 4 / 1024)
-  if sector < 16 then
+  if sector < 16 or self.family == 'lpc122x' then
     return sector
   else
     return math.floor ((sector - 16) / 8) + 16
@@ -86,5 +87,20 @@ add_part (0x25011722, 'lpc17xx', 'LPC1754', 'LQFP80', 128, 32)
 add_part (0x25001121, 'lpc17xx', 'LPC1752', 'LQFP80', 64, 16)
 add_part (0x25001118, 'lpc17xx', 'LPC1751', 'LQFP80', 32, 8)
 add_part (0x25001110, 'lpc17xx', 'LPC1751', 'LQFP80', 32, 8)
+-- LPC12xx
+add_part (0x3670002B, 'lpc122x', 'LPC12D27-301', 'LQFP100', 128, 8)
+add_part (0x3670002B, 'lpc122x', 'LPC1227-301',  'LQFP64',  128, 8)
+add_part (0x3670002B, 'lpc122x', 'LPC1227-301',  'LQFP48',  128, 8)
+add_part (0x3660002B, 'lpc122x', 'LPC1226-301',  'LQFP64',  96,  8)
+add_part (0x3660002B, 'lpc122x', 'LPC1226-301',  'LQFP48',  96,  8)
+add_part (0x3652002B, 'lpc122x', 'LPC1225-321',  'LQFP64',  80,  8)
+add_part (0x3650002B, 'lpc122x', 'LPC1225-301',  'LQFP64',  64,  8)
+add_part (0x3652002B, 'lpc122x', 'LPC1225-321',  'LQFP48',  80,  8)
+add_part (0x3650002B, 'lpc122x', 'LPC1225-301',  'LQFP48',  64,  8)
+add_part (0x3642C02B, 'lpc122x', 'LPC1224-121',  'LQFP64',  48,  4)
+add_part (0x3640C02B, 'lpc122x', 'LPC1224-101',  'LQFP64',  32,  4)
+add_part (0x3642C02B, 'lpc122x', 'LPC1224-121',  'LQFP48',  48,  4)
+add_part (0x3640C02B, 'lpc122x', 'LPC1224-101',  'LQFP48',  32,  4)
+
 
 return devices

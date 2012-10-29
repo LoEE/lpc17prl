@@ -10,7 +10,7 @@ local repl = require'repl'.start(0)
 
 local function usage()
   D.abort(1, string.format([=[
-  Usage: %s [-vqi] [-R|-V|-E|-B] [-O[no-]<option>[=<value>]] <file-name>
+  Usage: %s [-vqi] [-R|-V|-E|-B|-I] [-O[no-]<option>[=<value>]] <file-name>
 ]=], arg[0]))
 end
 
@@ -22,6 +22,7 @@ local opts = {
   verify = true,
   bootpin = true,
   mode = nil,
+  baudrate = 115200,
 }
 
 function parsekeyopt(s)
@@ -52,6 +53,7 @@ do
     elseif o == 'V' then opts.mode = 'verify'
     elseif o == 'E' then opts.mode = 'erase'
     elseif o == 'B' then opts.mode = 'blank-check'
+    elseif o == 'I' then opts.mode = 'isp'
     elseif o == 'O' then
       local a, v = parsekeyopt(a)
       if opts[a] ~= nil then
@@ -73,7 +75,7 @@ if #arg > 1 then usage() end
 opts.fname = arg[1]
 
 if opts.interactive and not opts.fname and not opts.mode then
-  opts.mode = 'isp'
+  opts.mode = 'terminal'
 end
 
 if opts.fname and not opts.mode then
@@ -118,7 +120,7 @@ else
 end
 
 
-local isp
+local isp, sepack
 
 local function verify()
   local image = opts.image
@@ -172,30 +174,34 @@ local function main ()
   isp.use_bootpin = opts.bootpin
   isp.verbose = opts.verbose
 
-  isp:start()
+  if opts.mode ~= 'terminal' then
+    isp:start()
 
-  if opts.mode == 'isp' then return end
+    if opts.mode == 'write' then
+      isp:burn(0, opts.image)
+      if opts.verify then verify() end
+    elseif opts.mode == 'probe' then
+      -- nothing
+    elseif opts.mode == 'read' then
+      local data = isp:read_flash()
+      repl.ns.data = data
+      opts.fout:write(data)
+    elseif opts.mode == 'verify' then
+      verify()
+    elseif opts.mode == 'erase' then
+      isp:erase()
+    elseif opts.mode == 'blank-check' then
+      blank_check()
+    end
 
-  if opts.mode == 'write' then
-    isp:burn(0, opts.image)
-    if opts.verify then verify() end
-  elseif opts.mode == 'probe' then
-    -- nothing
-  elseif opts.mode == 'read' then
-    local data = isp:read_flash()
-    repl.ns.data = data
-    opts.fout:write(data)
-  elseif opts.mode == 'verify' then
-    verify()
-  elseif opts.mode == 'erase' then
-    isp:erase()
-  elseif opts.mode == 'blank-check' then
-    blank_check()
+    if opts.mode ~= 'isp' then
+      isp:stop()
+    end
   end
 
-  isp:stop()
-
-  if not opts.interactive then
+  if opts.interactive then
+    sepack:setup_uart('uart', opts.baudrate)
+  else
     os.exit(0)
   end
 end
@@ -205,11 +211,12 @@ local options = {
   verbose = opts.verbose - 1,
   serial = nil,
 }
-function options.callback (sepack)
-  isp = NXPisp:new(sepack)
+function options.callback (s)
+  sepack = s
+  isp = NXPisp:new(s)
   repl.agent:handle(sepack:mbox'uart', uart_handler)
   repl.ns.isp = isp
-  repl.ns.sepack = sepack
+  repl.ns.sepack = s
   repl.execute(main)
 end
 

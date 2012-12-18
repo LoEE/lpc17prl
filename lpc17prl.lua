@@ -8,10 +8,53 @@ local NXPisp = require'nxpisp'
 
 local repl = require'repl'.start(0)
 
+local usage_str = string.format([=[
+Usage:
+  %s [-vqi] [-O[no-]<option>[=<value>]] [-W|-R|-V <file-name>] [-P|-T|-E|-B|-I|-h]
+]=], arg[0])
+
+local help_str = [=[
+Flags:
+  -v  Verbose (increase verbosity)
+  -q  Quiet (decrease verbosity)
+  -i  Interactive (do not quit after programming)
+
+Modes:
+  with <file-name>:
+  -W  Write flash (default)
+  -R  Read flash
+  -V  Verify
+  without <file-name>:
+  -P  Probe for chip ID (default without -i)
+  -T  Terminal (default for -i)
+  -E  Erase
+  -B  Blank check
+  -I  Enter ISP mode (use with -i)
+  -h  Show this message
+
+Options (<> mark the default):
+  hex/<no-hex>
+    Output bytes received in interactive mode as hexadecimal numbers.
+  baudrate=115200
+    The baudrate to switch to after executing user code.
+  serial=""
+    Sepack serial number (will open the first available sepack
+    if empty).
+  <verify>/no-verify
+    Perform verification after programming (only significant with -W).
+  <maxbaud>/no-maxbaud
+    Switch to 750k baud during ISP.
+  <bootpin>/no-bootpin
+    Toggle the BOOT pin while resetting to enter ISP mode (otherwise
+    BOOT is left in high-Z).
+]=]
+
 local function usage()
-  D.abort(1, string.format([=[
-  Usage: %s [-vqi] [-R|-V|-E|-B|-I] [-O[no-]<option>[=<value>]] <file-name>
-]=], arg[0]))
+  D.abort(1, usage_str)
+end
+
+local function help()
+  D.abort(1, usage_str .. '\n' .. help_str)
 end
 
 local opts = {
@@ -23,6 +66,7 @@ local opts = {
   bootpin = true,
   mode = nil,
   baudrate = 115200,
+  serial = "",
 }
 
 function parsekeyopt(s)
@@ -45,15 +89,19 @@ function parsekeyopt(s)
 end
 
 do
-  for o, a in os.getopt(arg, 'qviRVEBO:') do
+  for o, a in os.getopt(arg, 'qvihRVEBO:') do
     if o == 'q' then opts.verbose = opts.verbose - 1
     elseif o == 'v' then opts.verbose = opts.verbose + 1
     elseif o == 'i' then opts.interactive = true
+    elseif o == 'W' then opts.mode = 'write'
     elseif o == 'R' then opts.mode = 'read'
     elseif o == 'V' then opts.mode = 'verify'
+    elseif o == 'P' then opts.mode = 'probe'
+    elseif o == 'T' then opts.mode = 'terminal'
     elseif o == 'E' then opts.mode = 'erase'
     elseif o == 'B' then opts.mode = 'blank-check'
     elseif o == 'I' then opts.mode = 'isp'
+    elseif o == 'h' then help()
     elseif o == 'O' then
       local a, v = parsekeyopt(a)
       if opts[a] ~= nil then
@@ -211,6 +259,7 @@ local options = {
   verbose = opts.verbose - 1,
   serial = nil,
 }
+if opts.serial ~= "" then options.serial = opts.serial end
 function options.callback (s)
   sepack = s
   isp = NXPisp:new(s)

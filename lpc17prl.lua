@@ -40,6 +40,8 @@ Options (<> mark the default):
   serial=""
     Sepack serial number (will open the first available sepack
     if empty).
+  product="SEPACK-NXP"
+    Sepack product name.
   <verify>/no-verify
     Perform verification after programming (only significant with -W).
   <maxbaud>/no-maxbaud
@@ -49,8 +51,9 @@ Options (<> mark the default):
     BOOT is left in high-Z).
 ]=]
 
+local all_args = {unpack(arg)}
 local function usage()
-  D.abort(1, usage_str)
+  D.abort(1, usage_str .. '\nGot: '..D.repr(all_args))
 end
 
 local function help()
@@ -67,6 +70,7 @@ local opts = {
   mode = nil,
   baudrate = 115200,
   serial = "",
+  product = "SEPACK-NXP",
 }
 
 function parsekeyopt(s)
@@ -255,7 +259,7 @@ local function main ()
 end
 
 local options = {
-  product = "SEPACK-NXP",
+  product = opts.product,
   verbose = opts.verbose - 1,
   serial = nil,
 }

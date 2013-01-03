@@ -7,22 +7,16 @@ local buffer = require'buffer'
 
 
 local NXPisp = Object:inherit{
-  uart = 'uart',
   cclk = 12000,
   verbose = 1,
   use_maxbaud = true,
   use_bootpin = true,
 }
 
-local LEDG  = 0x12
-local LEDY  = 0x1a
-local RESET = 0x09
-local BOOT  = 0x0a
-local TxD   = 0x17
-local RxD   = 0x16
-
 function NXPisp.init (self, sepack)
   self.sepack = sepack
+  self.uart = sepack.channels.uart
+  self.gpio = sepack.channels.gpio
   self.readbuf = buffer.new()
 end
 
@@ -30,59 +24,48 @@ end
 --
 -- Physical layer
 --
-function NXPisp.gpio (self, data)
-  return string.byte(self.sepack:xchg('gpio', data), 1, -1)
-end
-
-function NXPisp.setup_uart (self, ...)
-  self.sepack:setup_uart (self.uart, ...)
-end
-
 function NXPisp.connect (self)
-  if self.verbose > 0 then D.blue'÷ connected'() end
-  local bootpin
-  if self.use_bootpin then
-    bootpin = { 'O', BOOT,  '0', BOOT, }
-  else
-    bootpin = {}
+  do
+    local seq = self.gpio:seq():
+      output'NXP_RESET':
+      lo'NXP_RESET'
+    if self.use_bootpin then
+      seq:
+        output'NXP_BOOT':
+        lo'NXP_BOOT'
+    end
+    seq:
+      hi'LED':
+      delay(1):
+      peripheral'RXD':
+      peripheral('TXD', 'pull-none'):
+      run()
   end
-  local reset, boot = self:gpio{
-    'O', RESET, '0', RESET,
-    bootpin,
-    '1', LEDY, '1', LEDG,
-    'd', 0,
-    --'I', RESET, 'r', RESET, 'O', RESET,
-    --'I', BOOT, 'r', BOOT, 'O', BOOT,
-    'P', TxD, 'P', RxD,
-  }
-  --assert (reset == 0, 'could not force RESET to 0')
-  --assert (boot == 0, 'could not force BOOT to 0')
-  self:setup_uart(115200)
+  self.uart:setup(115200)
+  if self.verbose > 0 then D.blue'÷ connected'() end
 end
 
 function NXPisp.disconnect (self)
+  self.gpio:seq():
+    float'NXP_BOOT':
+    delay(10):
+    float'NXP_RESET':
+    input'TXD':
+    lo'LED':
+    run()
   if self.verbose > 0 then D.blue'÷ disconnected'() end
-  self:gpio{
-    'S', 'z', 'I', BOOT, 'd', 10, 'I', RESET,
-    'S', 'u', 'I', TxD,
-    '0', LEDY
-  }
 end
 
 function NXPisp.reset (self, bootloader)
   if self.verbose > 0 then D.blue('÷ reset, running '..(bootloader and 'bootloader' or 'user code'))() end
-  if bootloader then bootloader = '0' else bootloader = '1' end
-  local reset1, boot, reset2 = self:gpio{
-    '0', RESET, 'd', 20,
-    --'I', RESET, 'r', RESET, 'O', RESET,
-    bootloader, BOOT, 'd', 20,
-    --'I', BOOT, 'r', BOOT, 'O', BOOT,
-    '1', RESET, 'd', 1,
-    --'I', RESET, 'r', RESET, 'O', RESET,
-  }
-  --assert (reset1 == 0, 'could not force RESET to 0')
-  --assert (tostring(boot) == bootloader, 'could not force BOOT to '..bootloader)
-  --assert (reset2 == 1, 'could not force RESET to 1')
+  self.gpio:seq():
+    lo'NXP_RESET':
+    delay(20):
+    write('NXP_BOOT', not bootloader):
+    delay(20):
+    hi'NXP_RESET':
+    delay(20):
+    run()
 end
 
 
@@ -91,7 +74,7 @@ end
 --
 function NXPisp.wr (self, data)
   if self.verbose > 1 then D.blue'»'(data) end
-  self.sepack:write(self.uart, data)
+  self.uart:write(data)
 end
 
 function NXPisp.wrln (self, data)
@@ -105,7 +88,7 @@ end
 
 function NXPisp.rdln (self, ending)
   ending = ending or '\r\n'
-  local uart = self.sepack:mbox(self.uart)
+  local uart = self.uart.inbox
   while true do
     local line = self.readbuf:readuntil(ending, #ending)
     if line then
@@ -362,7 +345,7 @@ end
 
 function NXPisp.set_max_baudrate (self)
   self:run_code'baud_max'
-  self:setup_uart(750000)
+  self.uart:setup(750000)
 end
 
 function NXPisp.read_flash (self)

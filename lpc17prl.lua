@@ -1,5 +1,4 @@
 #!/usr/bin/env thb
-local S = require'sepack-old'
 local B = require'binary'
 local D = require'util'
 local T = require'thread'
@@ -252,25 +251,33 @@ local function main ()
   end
 
   if opts.interactive then
-    sepack:setup_uart('uart', opts.baudrate)
+    isp.uart:setup(opts.baudrate)
   else
     os.exit(0)
   end
 end
 
-local options = {
-  product = opts.product,
-  verbose = opts.verbose - 1,
-  serial = nil,
-}
-if opts.serial ~= "" then options.serial = opts.serial end
-function options.callback (s)
-  sepack = s
-  isp = NXPisp:new(s)
-  repl.agent:handle(sepack:mbox'uart', uart_handler)
-  repl.ns.isp = isp
-  repl.ns.sepack = s
-  repl.execute(main)
-end
+local ExtProc = require'extproc'
+local Sepack = require'sepack'
 
-S.open (options)
+if opts.serial == "" then opts.serial = nil end
+local extproc_err, sepack_err
+if opts.verbose > 2 then
+  sepack_err = io.stderr
+  if opts.verbose > 3 then extproc_err = io.stderr end
+end
+repl.execute(function ()
+  sepack = Sepack:new(ExtProc:newUsb(opts.product, opts.serial, extproc_err), sepack_err)
+  sepack.verbose = opts.verbose - 1
+  while true do
+    local status = sepack.statbox:recv()
+    if status == 'ready' then break end
+    D.blue'÷'(status)
+  end
+  _G.sepack = sepack
+  isp = NXPisp:new(sepack)
+  _G.isp = isp
+  repl.agent:handle(sepack.channels.uart.inbox, uart_handler)
+  main()
+end)
+require'loop'.run()

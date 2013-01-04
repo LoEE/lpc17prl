@@ -65,10 +65,15 @@ local function add_part (id, family, name, package, flash, ram)
   }
 end
 
+-- FIXME: package cannot be determined solely from part-id
+
 -- LPC13xx
 add_part (0x2C42502B, 'lpc13xx', 'LPC1311', 'HVQFN33', 8, 4)
+add_part (0x1816902B, 'lpc13xx', 'LPC1311/01', 'HVQFN33', 8, 4)
 add_part (0x2C40102B, 'lpc13xx', 'LPC1313', 'HVQFN33', 32, 8)
 add_part (0x2C40102B, 'lpc13xx', 'LPC1313', 'LQFP48', 32, 8)
+add_part (0x1830102B, 'lpc13xx', 'LPC1313/01', 'HVQFN33', 32, 8)
+add_part (0x1830102B, 'lpc13xx', 'LPC1313/01', 'LQFP48', 32, 8)
 add_part (0x3D01402B, 'lpc13xx', 'LPC1342', 'HVQFN33', 16, 4)
 add_part (0x3D00002B, 'lpc13xx', 'LPC1343', 'HVQFN33', 32, 8)
 add_part (0x3D00002B, 'lpc13xx', 'LPC1343', 'LQFP48', 32, 8)

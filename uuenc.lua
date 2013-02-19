@@ -49,6 +49,7 @@ end
 
 local function decode_line (str)
   local len = decode1(string.byte(str, 1, 1))
+  if (#str - 1) % 4 ~= 0 then error('invalid uuencoded line: '..D.repr(str)) end
   o = {}
   for i=2,#str,4 do
     o[#o+1] = decode3 (str, i)

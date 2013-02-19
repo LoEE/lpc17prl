@@ -42,6 +42,7 @@ function NXPisp.connect (self)
       run()
   end
   self.uart:setup(115200)
+  self.uart:settimeout('tx', 9)
   if self.verbose > 0 then D.blue'÷ connected'() end
 end
 
@@ -315,7 +316,6 @@ function NXPisp.write_sector (self, image, sector)
     local block = string.sub(image, bs+1, be+1)
     if #block % 4 ~= 0 then block = block .. string.rep('\0', 4 - #block % 4) end
     if not block_empty(block) then
-      D('.','nonl')()
       self:write_to_ram (freeram, block)
       self:copy_ram_to_flash (bs, freeram, freeram+bsize-1)
     end
@@ -367,9 +367,8 @@ function NXPisp.burn (self, dest, image)
   end
   self:erase_region(0, dest + len - 1)
   local last_sector = self.part:addr2sector(dest + len)
-  for sector=1,last_sector do self:write_sector (image, sector) end
-  self:write_sector (image, 0)
-  D''()
+  for sector=1,last_sector do self:write_sector (image, sector) D('.','nonl')() end
+  self:write_sector (image, 0) D('.')()
 end
 
 function NXPisp.start (self)

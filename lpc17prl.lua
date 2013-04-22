@@ -92,7 +92,7 @@ function parsekeyopt(s)
 end
 
 do
-  for o, a in os.getopt(arg, 'qvihRVEBO:') do
+  for o, a in os.getopt(arg, 'qvihWRVPTEBIO:') do
     if o == 'q' then opts.verbose = opts.verbose - 1
     elseif o == 'v' then opts.verbose = opts.verbose + 1
     elseif o == 'i' then opts.interactive = true

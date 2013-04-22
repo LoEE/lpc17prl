@@ -18,6 +18,12 @@ function NXPisp.init (self, sepack)
   self.uart = sepack.channels.uart
   self.gpio = sepack.channels.gpio
   self.readbuf = buffer.new()
+  self.gpio:seq():
+    input'NXP_RESET':
+    input'NXP_BOOT':
+    peripheral'RXD':
+    input'TXD':
+    run()
 end
 
 

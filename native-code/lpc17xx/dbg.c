@@ -23,12 +23,25 @@ void map_boot () {
 #define PLL0CON  PLL0REG(0x00)
 #define PLL0CFG  PLL0REG(0x04)
 #define PLL0STAT PLL0REG(0x08)
-#define PLL0FEED PLL0REF(0x0C)
+#define PLL0FEED PLL0REG(0x0C)
+
+#define CCLKCFG (*(volatile unsigned int *)(0x400FC104))
 
 void baud_max () {
   while (!(U0LSR & (1 << 6)));
   PCLKSEL0 |= 1 << 6;
-  // FIXME: SETUP PLL for 12MHz from 4MHz IRC
+  PLL0CON &= ~(1 << 1); // disconnect
+  PLL0FEED = 0xaa; PLL0FEED = 0x55;
+  PLL0CON &= ~(1 << 0); // power down
+  PLL0FEED = 0xaa; PLL0FEED = 0x55;
+  PLL0CFG = (69 - 1) + ((2 - 1) << 16); // 4MHz / 2 * 69 * 2 = 276MHz
+  PLL0FEED = 0xaa; PLL0FEED = 0x55;
+  CCLKCFG = (23 - 1); // 276MHz / 23 = 12MHz
+  PLL0CON = (1 << 0); // power up
+  PLL0FEED = 0xaa; PLL0FEED = 0x55;
+  while (!(PLL0STAT & (1 << 26))); // wait for PLL lock
+  PLL0CON = (1 << 1) | (1 << 0); // connect
+  PLL0FEED = 0xaa; PLL0FEED = 0x55;
   U0FDR = (1 << 4) | 0; // disable fractional
   U0LCR |= 1 << 7; // DLAB = 1
   U0DLM = 0;

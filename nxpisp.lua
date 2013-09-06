@@ -301,11 +301,12 @@ function NXPisp.run (self, addr)
 end
 
 function NXPisp.read_memory (self, s, e)
-  if s % 4 ~= 0 then error("start address not divisible by 4", 2) end
+  local soff = -(s % 4)
+  local eoff = -(e+1) % 4
+  s = s+soff e = e+eoff
   local len = e+1 - s
-  if len % 4 ~= 0 then error("length not divisible by 4", 2) end
   self:cmd(string.format("R %d %d", s, len))
-  return self:uurecv (s, e)
+  return self:uurecv(s, e):sub(-soff, -eoff)
 end
 
 local function block_empty (block)

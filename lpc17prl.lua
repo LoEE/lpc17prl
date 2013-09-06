@@ -269,11 +269,7 @@ end
 repl.execute(function ()
   sepack = Sepack:new(ExtProc:newUsb(opts.product, opts.serial, extproc_err), sepack_err)
   sepack.verbose = opts.verbose - 1
-  while true do
-    local status = sepack.statbox:recv()
-    if status == 'ready' then break end
-    D.blue'÷'(status)
-  end
+  while D.blue'÷'(sepack.connected:recv()) ~= true do end
   _G.sepack = sepack
   isp = NXPisp:new(sepack)
   _G.isp = isp

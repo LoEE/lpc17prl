@@ -245,6 +245,10 @@ local function main ()
       blank_check()
     end
 
+    if opts.interactive then
+      isp.uart:setup(opts.baudrate)
+    end
+
     if opts.mode ~= 'isp' then
       isp:stop()
     end

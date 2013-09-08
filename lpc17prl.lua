@@ -1,6 +1,6 @@
 #!/usr/bin/env thb
 local B = require'binary'
-local D = require'util'
+local D = require'util' D.prepend_timestamps = false D.prepend_thread_names = false
 local T = require'thread'
 local Object = require'oo'
 local NXPisp = require'nxpisp'
@@ -265,15 +265,28 @@ local ExtProc = require'extproc'
 local Sepack = require'sepack'
 
 if opts.serial == "" then opts.serial = nil end
-local extproc_err, sepack_err
+local extproc_log, sepack_log
 if opts.verbose > 2 then
-  sepack_err = io.stderr
-  if opts.verbose > 3 then extproc_err = io.stderr end
+  sepack_log = log:sub'sepack'
+  if opts.verbose > 3 then extproc_log = sepack_log:sub'ext' end
 end
 repl.execute(function ()
-  sepack = Sepack:new(ExtProc:newUsb(opts.product, opts.serial, extproc_err), sepack_err)
+  sepack = Sepack:new(ExtProc:newUsb(opts.product, opts.serial, extproc_log), sepack_log)
   sepack.verbose = opts.verbose - 1
-  while D.blue'÷'(sepack.connected:recv()) ~= true do end
+  while true do
+    local status = sepack.connected:recv()
+    if status == true then
+      break
+    elseif status == false then
+      local msg = {opts.product}
+      if opts.serial then
+        msg[#msg+1] = D.unq("with serial number")
+        msg[#msg+1] = opts.serial
+      end
+      msg[#msg+1] = D.unq('not found')
+      D.red'÷'(unpack(msg))
+    end
+  end
   _G.sepack = sepack
   isp = NXPisp:new(sepack)
   _G.isp = isp

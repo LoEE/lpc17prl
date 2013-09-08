@@ -374,8 +374,10 @@ function NXPisp.burn (self, dest, image)
   end
   self:erase_region(0, dest + len - 1)
   local last_sector = self.part:addr2sector(dest + len)
-  for sector=1,last_sector do self:write_sector (image, sector) D('.','nonl')() end
-  self:write_sector (image, 0) D('.')()
+  io.stderr:write(D.color'blue'.."["..string.rep(" ", last_sector + 1).."]"..D.color'norm'..'\r') io.stderr:flush()
+  io.stderr:write(D.color'blue'.."["..D.color'norm')
+  for sector=1,last_sector do self:write_sector (image, sector) io.stderr:write(D.color'blue'.."."..D.color'norm') io.stderr:flush() end
+  self:write_sector (image, 0) io.stderr:write(D.color'blue'.."."..D.color'norm'..'\n')
 end
 
 function NXPisp.start (self)

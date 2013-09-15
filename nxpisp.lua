@@ -367,6 +367,10 @@ function NXPisp.erase (self)
   self:erase_region(0, self.part.flash * 1024 - 1)
 end
 
+local function statusbar(i, max, suffix)
+  io.stderr:write("\r"..D.color'blue'.."["..string.rep(".", i)..string.rep(" ", max - i).."]"..(suffix or '')) io.stderr:flush()
+end
+
 function NXPisp.burn (self, dest, image)
   local len = #image
   if dest + len > self.part.flash * 1024 then
@@ -374,10 +378,9 @@ function NXPisp.burn (self, dest, image)
   end
   self:erase_region(0, dest + len - 1)
   local last_sector = self.part:addr2sector(dest + len)
-  io.stderr:write(D.color'blue'.."["..string.rep(" ", last_sector + 1).."]"..D.color'norm'..'\r') io.stderr:flush()
-  io.stderr:write(D.color'blue'.."["..D.color'norm')
-  for sector=1,last_sector do self:write_sector (image, sector) io.stderr:write(D.color'blue'.."."..D.color'norm') io.stderr:flush() end
-  self:write_sector (image, 0) io.stderr:write(D.color'blue'.."."..D.color'norm'..'\n')
+  statusbar(0, last_sector + 1)
+  for sector=1,last_sector do self:write_sector (image, sector) statusbar(sector - 1, last_sector + 1) end
+  self:write_sector (image, 0) statusbar(last_sector + 1, last_sector + 1, "\n")
 end
 
 function NXPisp.start (self)

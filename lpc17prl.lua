@@ -5,7 +5,7 @@ local T = require'thread'
 local Object = require'oo'
 local NXPisp = require'nxpisp'
 
-local repl = require'repl'.start(0)
+local repl = require'repl'
 
 local usage_str = string.format([=[
 Usage:
@@ -256,6 +256,7 @@ local function main ()
 
   if opts.interactive then
     isp.uart:setup(opts.baudrate)
+    repl.start(0)
   else
     os.exit(0)
   end
@@ -289,8 +290,10 @@ repl.execute(function ()
   end
   _G.sepack = sepack
   isp = NXPisp:new(sepack)
+  isp.verbose = opts.verbose
   _G.isp = isp
   repl.agent:handle(sepack.channels.uart.inbox, uart_handler)
-  main()
+  local ok, err = T.pcall(main)
+  if not ok then D.red'error:'(D.unq(err)) os.exit(2) end
 end)
 require'loop'.run()

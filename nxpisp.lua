@@ -9,6 +9,7 @@ local buffer = require'buffer'
 local NXPisp = Object:inherit{
   cclk = 12000,
   verbose = 1,
+  read_timeout = 5,
   use_maxbaud = true,
   use_bootpin = true,
 }
@@ -89,7 +90,7 @@ function NXPisp.wrln (self, data)
   self:wr(data .. '\r')
   local r = self:rdln'\r'
   if r ~= data then
-    error(string.format('invalid command echo: %q', r), 2)
+    error(string.format('invalid command echo: %q', r), 0)
   end
 end
 
@@ -106,7 +107,7 @@ function NXPisp.rdln (self, ending)
     end
     T.recv{
       [uart] = function (d) self.readbuf:write (d) end,
-      [T.Timeout:new(2)] = function () error ('read timeout', 5) end,
+      [T.Timeout:new(self.read_timeout)] = function () error ('read timeout', 0) end,
     }
   end
 end
@@ -117,7 +118,7 @@ function NXPisp.expect (self, ex, err)
   if s ~= 1 or e ~= #d then
     local msg = string.format('got %q, expected %q', d, ex)
     if err then msg = err..': '..msg end
-    error(msg, 2)
+    error(msg, 0)
   end
 end
 
@@ -151,7 +152,7 @@ function NXPisp.uusend (self, data, s, e)
     for i,line in ipairs(lines) do
       local r = self:rdln'\r'
       if line ~= r then
-        error(string.format('invalid uuencoded data echo: %q', r), 2)
+        error(string.format('invalid uuencoded data echo: %q', r), 0)
       end
     end
     self:wrln(tostring(sum))
@@ -174,7 +175,7 @@ function NXPisp.uurecv (self, s, e)
     b = table.concat(b)
     local sum = self:uuchecksum (b)
     local rsum = tonumber(self:rdln())
-    if sum ~= rsum then error (string.format ('invalid data checksum: %d (expected: %d)', rsum, sum), 1) end
+    if sum ~= rsum then error (string.format ('invalid data checksum: %d (expected: %d)', rsum, sum), 0) end
     self:wrln('OK')
     data[#data+1] = b
   end
@@ -208,7 +209,7 @@ function NXPisp.read_status (self, dont_panic)
   local code = tonumber(self:rdln())
   local status = self.status_codes[code] or ('unknown-status-code-' .. code)
   if not dont_panic and status ~= 'CMD_SUCCESS' then
-    error ('isp error: ' .. status, 2)
+    error ('isp error: ' .. status, 0)
   end
   return status
 end
@@ -271,7 +272,7 @@ function NXPisp.blank_check_region (self, s, e)
     local val  = tonumber(self:rdln())
     return nil, addr, val
   else
-    error ('isp error: ' .. status, 2)
+    error ('isp error: ' .. status, 0)
   end
 end
 
@@ -374,7 +375,7 @@ end
 function NXPisp.burn (self, dest, image)
   local len = #image
   if dest + len > self.part.flash * 1024 then
-    error(string.format ("image to large for this device (%d bytes)", dest+len), 2)
+    error(string.format ("image to large for this device (%d bytes)", dest+len), 0)
   end
   self:erase_region(0, dest + len - 1)
   local last_sector = self.part:addr2sector(dest + len)
@@ -388,15 +389,17 @@ function NXPisp.start (self)
   local ok, err
   for i=1,10 do
     self:reset(true)
+    self.read_timeout = .2
     ok, err = T.pcall(function () self:synchronize() end)
     if ok then break end
     if self.verbose > 0 then D.red('synchronization failed: '..err)() end
   end
-  if not ok then error('synchronization failed: giving up after 10 retries') end
+  self.read_timeout = nil
+  if not ok then error('synchronization failed: giving up after 10 retries', 0) end
   local part_id = self:read_part_id()
   local part = self.devices[part_id]
   if not part then
-    error("unknown part id: " .. part_id)
+    error("unknown part id: " .. part_id, 0)
   end
   if self.verbose > 0 then D.green('Found '..part.name..' with '..part.flash .. 'kB flash and '..part.ram..'kB RAM in '..part.package)() end
   self.part = part

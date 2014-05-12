@@ -377,14 +377,16 @@ function NXPisp.burn (self, dest, image)
   if dest + len > self.part.flash * 1024 then
     error(string.format ("image to large for this device (%d bytes)", dest+len), 0)
   end
-  self:erase_region(0, dest + len - 1)
+  if not self.noerase then
+    self:erase_region(0, dest + len - 1)
+  end
   local last_sector = self.part:addr2sector(dest + len)
   statusbar(0, last_sector + 1)
   for sector=1,last_sector do self:write_sector (image, sector) statusbar(sector - 1, last_sector + 1) end
   self:write_sector (image, 0) statusbar(last_sector + 1, last_sector + 1, "\n")
 end
 
-function NXPisp.start (self)
+function NXPisp.start (self, clean)
   self:connect()
   local ok, err
   for i=1,10 do
@@ -404,6 +406,7 @@ function NXPisp.start (self)
   if self.verbose > 0 then D.green('Found '..part.name..' with '..part.flash .. 'kB flash and '..part.ram..'kB RAM in '..part.package)() end
   self.part = part
   self:unlock()
+  if clean then self:erase() end 
   self:disable_boot_memory_map()
   if self.use_maxbaud then self:set_max_baudrate() end
 end

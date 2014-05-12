@@ -17,6 +17,7 @@ Flags:
   -v  Verbose (increase verbosity)
   -q  Quiet (decrease verbosity)
   -i  Interactive (do not quit after programming)
+  -c  Clean (erase whole flash to disable CRP)
 
 Modes:
   with <file-name>:
@@ -92,16 +93,17 @@ function parsekeyopt(s)
 end
 
 do
-  for o, a in os.getopt(arg, 'qvihWRVPTEBIO:') do
+  for o, a in os.getopt(arg, 'qvcihWRVPTEBIO:') do
     if o == 'q' then opts.verbose = opts.verbose - 1
     elseif o == 'v' then opts.verbose = opts.verbose + 1
     elseif o == 'i' then opts.interactive = true
+    elseif o == 'c' then opts.clean = true
     elseif o == 'W' then opts.mode = 'write'
     elseif o == 'R' then opts.mode = 'read'
     elseif o == 'V' then opts.mode = 'verify'
     elseif o == 'P' then opts.mode = 'probe'
     elseif o == 'T' then opts.mode = 'terminal'
-    elseif o == 'E' then opts.mode = 'erase'
+    elseif o == 'E' then opts.fullerase = true
     elseif o == 'B' then opts.mode = 'blank-check'
     elseif o == 'I' then opts.mode = 'isp'
     elseif o == 'h' then help()
@@ -226,7 +228,12 @@ local function main ()
   isp.verbose = opts.verbose
 
   if opts.mode ~= 'terminal' then
-    isp:start()
+    isp:start(opts.clean)
+    
+    if opts.fullerase then
+      isp:erase()
+      isp.noerase = true
+    end
 
     if opts.mode == 'write' then
       isp:burn(0, opts.image)
@@ -239,8 +246,6 @@ local function main ()
       opts.fout:write(data)
     elseif opts.mode == 'verify' then
       verify()
-    elseif opts.mode == 'erase' then
-      isp:erase()
     elseif opts.mode == 'blank-check' then
       blank_check()
     end

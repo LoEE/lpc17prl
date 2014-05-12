@@ -93,11 +93,12 @@ function parsekeyopt(s)
 end
 
 do
-  for o, a in os.getopt(arg, 'qvcihWRVPTEBIO:') do
+  for o, a in os.getopt(arg, 'qvcihl:WRVPTEBIO:') do
     if o == 'q' then opts.verbose = opts.verbose - 1
     elseif o == 'v' then opts.verbose = opts.verbose + 1
     elseif o == 'i' then opts.interactive = true
     elseif o == 'c' then opts.clean = true
+    elseif o == 'l' then opts.customcode = a
     elseif o == 'W' then opts.mode = 'write'
     elseif o == 'R' then opts.mode = 'read'
     elseif o == 'V' then opts.mode = 'verify'
@@ -165,7 +166,6 @@ if opts.mode == 'read' then
 end
 
 
-local uart_handler
 if opts.hex then
   function uart_handler (data) D.green'«'(D.unq(B.bin2hex(data))) end
 else
@@ -261,6 +261,11 @@ local function main ()
 
   if opts.interactive then
     isp.uart:setup(opts.baudrate)
+    if opts.customcode then
+      local code, err = loadfile(opts.customcode)
+      if not code then D.red'customcode error:'(D.unq(err)) os.exit(2) end
+      repl.execute(code)
+    end
     repl.start(0)
   else
     os.exit(0)

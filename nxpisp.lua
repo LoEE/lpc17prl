@@ -19,9 +19,11 @@ function NXPisp.init (self, sepack)
   self.uart = sepack.channels.uart
   self.gpio = sepack.channels.gpio
   self.readbuf = buffer.new()
+  self.gpio:alias('IO7', 'NXP_BOOT2')
   self.gpio:seq():
     input'NXP_RESET':
     input'NXP_BOOT':
+    input'NXP_BOOT2':
     peripheral'RXD':
     input'TXD':
     run()
@@ -39,7 +41,9 @@ function NXPisp.connect (self)
     if self.use_bootpin then
       seq:
         output'NXP_BOOT':
-        lo'NXP_BOOT'
+        lo'NXP_BOOT':
+        output'NXP_BOOT2':
+        lo'NXP_BOOT2'
     end
     seq:
       hi'LED':
@@ -56,6 +60,7 @@ end
 function NXPisp.disconnect (self)
   self.gpio:seq():
     float'NXP_BOOT':
+    float'NXP_BOOT2':
     delay(10):
     float'NXP_RESET':
     input'TXD':
@@ -70,6 +75,7 @@ function NXPisp.reset (self, bootloader)
     lo'NXP_RESET':
     delay(20):
     write('NXP_BOOT', not bootloader):
+    write('NXP_BOOT2', not bootloader):
     delay(20):
     hi'NXP_RESET':
     delay(20):
@@ -85,10 +91,17 @@ function NXPisp.wr (self, data)
   self.uart:write(data)
 end
 
+function NXPisp.rd (self)
+  local data = self.uart.inbox:recv()
+  if self.verbose > 1 then D.cyan'«'(data) end
+  return data
+end
+
+
 function NXPisp.wrln (self, data)
   data = tostring(data)
-  self:wr(data .. '\r')
-  local r = self:rdln'\r'
+  self:wr(data .. '\r\n')
+  local r = self:rdln'\r\n'
   if r ~= data then
     error(string.format('invalid command echo: %q', r), 0)
   end
@@ -107,7 +120,9 @@ function NXPisp.rdln (self, ending)
     end
     T.recv{
       [uart] = function (d) self.readbuf:write (d) end,
-      [T.Timeout:new(self.read_timeout)] = function () error ('read timeout', 0) end,
+      [T.Timeout:new(self.read_timeout)] = function ()
+        error (string.format('read timeout after: %q', self.readbuf:peek()), 0)
+      end,
     }
   end
 end
@@ -182,6 +197,39 @@ function NXPisp.uurecv (self, s, e)
   return table.concat(data)
 end
 
+
+--
+-- binary data transmision
+--
+function NXPisp.binsend (self, data, s, e)
+  if self.part.uuencode then
+    self:uusend(data, s, e)
+  else
+    for bs,be in B.allslices (s, e, NXPisp.uu_block_size) do
+      local block = string.sub(data, bs, be)
+      self:wr(block)
+      local reply = self:rd()
+      if reply ~= block then
+        error (string.format ('invalid binary echo: %q', reply), 0)
+      end
+    end
+  end
+end
+
+function NXPisp.binrecv (self, s, e)
+  if self.part.uuencode then
+    return self:uurecv(s, e)
+  else
+    local n = e-s+1
+    local data = {}
+    while n > 0 do
+      local block = self:rd()
+      data[#data+1] = block
+      n = n - #block
+    end
+    return table.concat(data)
+  end
+end
 
 --
 -- ISP bootloader commands
@@ -283,7 +331,7 @@ function NXPisp.write_to_ram (self, dest, data, s, e)
   local len = e+1 - s
   if len % 4 ~= 0 then error("length not divisible by 4", 2) end
   self:cmd(string.format("W %d %d", dest, len))
-  self:uusend(data, s, e)
+  self:binsend(data, s, e)
 end
 
 function NXPisp.copy_ram_to_flash (self, dest, s, e)
@@ -302,12 +350,12 @@ function NXPisp.run (self, addr)
 end
 
 function NXPisp.read_memory (self, s, e)
-  local soff = -(s % 4)
+  local origlen = e+1 - s
   local eoff = -(e+1) % 4
-  s = s+soff e = e+eoff
+  local e = e+eoff
   local len = e+1 - s
   self:cmd(string.format("R %d %d", s, len))
-  return self:uurecv(s, e):sub(-soff, -eoff)
+  return self:binrecv(s, e):sub(1, origlen)
 end
 
 local function block_empty (block)

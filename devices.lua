@@ -5,6 +5,8 @@ local NXPpart = Object:inherit{}
 function NXPpart.bootloader_ram (self)
   if self.family == 'lpc13xx' or self.family == 'lpc122x' then
     return 0x260
+  elseif self.family == 'lpc15xx' then
+    return 0x9e4
   elseif self.family == 'lpc17xx' then
     return 0x200
   else
@@ -12,8 +14,16 @@ function NXPpart.bootloader_ram (self)
   end
 end
 
+function NXPpart.ram_start (self)
+  if self.family == 'lpc15xx' then
+    return 0x02000000
+  else
+    return 0x10000000
+  end
+end
+
 function NXPpart.free_ram_start (self)
-  return 0x10000000 + self:bootloader_ram()
+  return self:ram_start() + self:bootloader_ram()
 end
 
 function NXPpart.free_ram_size (self)
@@ -22,7 +32,9 @@ function NXPpart.free_ram_size (self)
 end
 
 function NXPpart.sector_size (self, s)
-  if s < 16 or self.family == 'lpc122x' then
+  if self.const_sector_size then
+    return self.const_sector_size * 1024
+  elseif s < 16 then
     return 4*1024
   else
     return 32*1024
@@ -30,7 +42,9 @@ function NXPpart.sector_size (self, s)
 end
 
 function NXPpart.sector_start_addr (self, s)
-  if s < 16 or self.family == 'lpc122x' then
+  if self.const_sector_size then
+    return s * self.const_sector_size * 1024
+  elseif s < 16 then
     return s * 4*1024
   else
     return 16 * 4*1024 + (s - 16) * 32*1024
@@ -38,11 +52,15 @@ function NXPpart.sector_start_addr (self, s)
 end
 
 function NXPpart.addr2sector (self, addr)
-  local sector = math.floor(addr / 4 / 1024)
-  if sector < 16 or self.family == 'lpc122x' then
-    return sector
+  if self.const_sector_size then
+    return math.floor(addr / self.const_sector_size / 1024)
   else
-    return math.floor ((sector - 16) / 8) + 16
+    local sector = math.floor(addr / 4 / 1024)
+    if sector < 16 or self.family == 'lpc122x' then
+      return sector
+    else
+      return math.floor ((sector - 16) / 8) + 16
+    end
   end
 end
 
@@ -50,10 +68,18 @@ local devices = {}
 
 local function add_part (id, family, name, package, flash, ram)
   local main_ram
-  if ram == 4 or ram == 8 or ram == 16 then
+  if ram == 4 or ram == 8 or ram == 16 or family == 'lpc15xx' then
     main_ram = ram
   elseif ram == 32 or ram == 64 then
     main_ram = ram / 2
+  end
+  local const_sector_size = false
+  if family == 'lpc111x' or family == 'lpc122x' or family == 'lpc15xx' then
+    const_sector_size = 4
+  end
+  local uuencode = true
+  if family == 'lpc15xx' then
+    uuencode = false
   end
   devices[id] = NXPpart:inherit{
     name = name,
@@ -107,6 +133,14 @@ add_part (0x3642C02B, 'lpc122x', 'LPC1224-121',  'LQFP64',  48,  4)
 add_part (0x3640C02B, 'lpc122x', 'LPC1224-101',  'LQFP64',  32,  4)
 add_part (0x3642C02B, 'lpc122x', 'LPC1224-121',  'LQFP48',  48,  4)
 add_part (0x3640C02B, 'lpc122x', 'LPC1224-101',  'LQFP48',  32,  4)
+-- LPC15xx
+add_part (0x00001549, 'lpc15xx', 'LPC1549', 'LQFP..', 256, 36)
+add_part (0x00001548, 'lpc15xx', 'LPC1548', 'LQFP..', 128, 20)
+add_part (0x00001547, 'lpc15xx', 'LPC1547', 'LQFP..',  64, 12)
+add_part (0x00001519, 'lpc15xx', 'LPC1519', 'LQFP..', 256, 36)
+add_part (0x00001518, 'lpc15xx', 'LPC1518', 'LQFP..', 128, 20)
+add_part (0x00001517, 'lpc15xx', 'LPC1517', 'LQFP..',  64, 12)
+
 
 
 return devices

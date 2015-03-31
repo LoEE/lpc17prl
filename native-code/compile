@@ -1,7 +1,7 @@
 #!/bin/zsh
 set -e
 
-families=(lpc122x lpc13xx lpc17xx lpc15xx)
+families=(lpc111x lpc122x lpc13xx lpc17xx lpc15xx)
 
 dump () {
   arm-none-eabi-objcopy -O binary -j .text.$1 dbg.o $1.bin
@@ -11,7 +11,7 @@ compile () {
   cd $dir
   rm -f *.bin(N)
   cflags=(-Os -mthumb -ffunction-sections --std=gnu99)
-  if [[ $dir == lpc12* ]]; then
+  if [[ $dir == lpc12* || $dir == lpc11* ]]; then
     cflags=(-mcpu=cortex-m0 $cflags)
   else
     cflags=(-mcpu=cortex-m3 $cflags)

@@ -121,7 +121,7 @@ function NXPisp.rdln (self, ending)
     T.recv{
       [uart] = function (d) self.readbuf:write (d) end,
       [T.Timeout:new(self.read_timeout)] = function ()
-        error (string.format('read timeout after: %q', self.readbuf:peek()), 0)
+        error (string.format('read timeout after: %q', self.readbuf:peek() or ''), 0)
       end,
     }
   end

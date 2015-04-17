@@ -12,6 +12,7 @@ local NXPisp = Object:inherit{
   read_timeout = 5,
   use_maxbaud = true,
   use_bootpin = true,
+  endl = '\r\n',
 }
 
 function NXPisp.init (self, sepack)
@@ -100,8 +101,8 @@ end
 
 function NXPisp.wrln (self, data)
   data = tostring(data)
-  self:wr(data .. '\r\n')
-  local r = self:rdln'\r\n'
+  self:wr(data .. self.endl)
+  local r = self:rdln(self.endl)
   if r ~= data then
     error(string.format('invalid command echo: %q', r), 0)
   end
@@ -237,8 +238,13 @@ end
 function NXPisp.synchronize (self)
   self:wr'?'
   self:expect'.*Synchronized'
-  self:wrln'Synchronized'
-  self:expect'OK'
+  self:wr'Synchronized\r\n'
+  local sync = self:rdln()
+  if sync == 'Synchronized\rOK' then
+    self.endl = '\r'
+  elseif sync == 'Synchronized' then
+    self:expect'OK'
+  end
   self:wrln(self.cclk)
   self:expect'OK'
 end

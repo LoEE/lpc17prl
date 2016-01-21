@@ -9,7 +9,9 @@ local repl = require'repl'
 
 local usage_str = string.format([=[
 Usage:
-  %s [-vqi] [-O[no-]<option>[=<value>]] [-W|-R|-V <file-name>] [-P|-T|-E|-B|-I|-h]
+  %s
+    [-vqi] [-O[no-]<option>[=<value>]] [-l <lua-file>]
+    [-W|-R|-V <file-name>] [-P|-T|-E|-B|-I|-h]
 ]=], arg[0])
 
 local help_str = [=[
@@ -30,7 +32,11 @@ Modes:
   -E  Erase
   -B  Blank check
   -I  Enter ISP mode (use with -i)
-  -h  Show this message
+
+Other options:
+  -h  Show this help message
+  -l  Load and execute <lua-file> from the current folder before
+      starting the repl
 
 Options (<> mark the default):
   hex/<no-hex>

@@ -302,7 +302,7 @@ repl.execute(function ()
   isp = NXPisp:new(sepack)
   isp.verbose = opts.verbose
   _G.isp = isp
-  repl.agent:handle(sepack.channels.uart.inbox, uart_handler)
+  repl.agent:handle(sepack.channels.uart.inbox, function (...) uart_handler(...) end)
   local ok, err = T.pcall(main)
   if not ok then D.red'error:'(D.unq(err)) os.exit(2) end
 end)

@@ -11,7 +11,7 @@ local usage_str = string.format([=[
 Usage:
   %s
     [-vqi] [-O[no-]<option>[=<value>]] [-l <lua-file>]
-    [-W|-R|-V <file-name>] [-P|-T|-E|-B|-I|-h]
+    [-W|-R|-V|-X|-XW <file-name>] [-P|-T|-E|-B|-I|-h]
 ]=], arg[0])
 
 local help_str = [=[
@@ -26,6 +26,8 @@ Modes:
   -W  Write flash (default)
   -R  Read flash
   -V  Verify
+  -X  Calculate and write checksum
+  -XW Calculate checksum and write flash
   without <file-name>:
   -P  Probe for chip ID (default without -i)
   -T  Terminal (default for -i)
@@ -77,6 +79,7 @@ local opts = {
   baudrate = 115200,
   serial = "",
   product = "SEPACK-NXP",
+  write_after = false,
 }
 
 function parsekeyopt(s)
@@ -99,13 +102,15 @@ function parsekeyopt(s)
 end
 
 do
-  for o, a in os.getopt(arg, 'qvcihl:WRVPTEBIO:') do
+  for o, a in os.getopt(arg, 'qvcihl:WRVPTEBIXO:') do
     if o == 'q' then opts.verbose = opts.verbose - 1
     elseif o == 'v' then opts.verbose = opts.verbose + 1
     elseif o == 'i' then opts.interactive = true
     elseif o == 'c' then opts.clean = true
     elseif o == 'l' then opts.customcode = a
-    elseif o == 'W' then opts.mode = 'write'
+    elseif o == 'W' then
+      if opts.mode == 'calculate' then opts.write_after = true end
+      opts.mode = 'write'
     elseif o == 'R' then opts.mode = 'read'
     elseif o == 'V' then opts.mode = 'verify'
     elseif o == 'P' then opts.mode = 'probe'
@@ -113,6 +118,7 @@ do
     elseif o == 'E' then opts.fullerase = true
     elseif o == 'B' then opts.mode = 'blank-check'
     elseif o == 'I' then opts.mode = 'isp'
+    elseif o == 'X' then opts.mode = 'calculate'
     elseif o == 'h' then help()
     elseif o == 'O' then
       local a, v = parsekeyopt(a)
@@ -148,6 +154,33 @@ end
 
 if opts.verbose > 3 then
   D.blue'opts:'(opts)
+end
+
+if opts.mode == 'calculate' or opts.write_after then
+  if not opts.fname then D.abort(2, "Binary file not provided") end
+
+  local f, err = io.open(opts.fname, "r+b")
+  if not f then D.abort(2, "Cannot open input file: "..opts.fname..": "..err) end
+
+  local sum = 0
+
+  for byteno=1,7 do
+    local bytes = f:read(4)
+    local int32 = B.dec32LE(bytes)
+    sum = sum + int32
+  end
+
+  sum = -sum
+
+  f:seek("set", 28) -- ensure that we are writing checksum in correct place
+  f:write(B.enc32LE(sum))
+  D.green'Checksum stored'()
+  f:close()
+
+  if opts.write_after then opts.mode = 'write'
+  else os.exit()
+  end
+
 end
 
 if opts.mode == 'write' or opts.mode == 'verify' then

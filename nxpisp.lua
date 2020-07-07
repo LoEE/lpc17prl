@@ -21,10 +21,12 @@ function NXPisp.init (self, sepack)
   self.gpio = sepack.channels.gpio
   self.readbuf = buffer.new()
   self.gpio:alias('IO7', 'NXP_BOOT2')
+  self.gpio:alias('IO5', 'NXP_BOOT3')
   self.gpio:seq():
     input'NXP_RESET':
     input'NXP_BOOT':
     input'NXP_BOOT2':
+    input'NXP_BOOT3':
     peripheral'RXD':
     input'TXD':
     run()
@@ -44,7 +46,9 @@ function NXPisp.connect (self)
         output'NXP_BOOT':
         lo'NXP_BOOT':
         output'NXP_BOOT2':
-        lo'NXP_BOOT2'
+        lo'NXP_BOOT2':
+        output'NXP_BOOT3':
+        lo'NXP_BOOT3'
     end
     seq:
       hi'LED':
@@ -62,6 +66,7 @@ function NXPisp.disconnect (self)
   self.gpio:seq():
     float'NXP_BOOT':
     float'NXP_BOOT2':
+    float'NXP_BOOT3':
     input'TXD':
     lo'LED':
     delay(10):
@@ -78,6 +83,7 @@ function NXPisp.reset (self, bootloader)
       delay(20):
       write('NXP_BOOT', false):
       write('NXP_BOOT2', false):
+      write('NXP_BOOT3', false):
       delay(20):
       hi'NXP_RESET':
       delay(20):
@@ -88,9 +94,11 @@ function NXPisp.reset (self, bootloader)
       delay(20):
       write('NXP_BOOT', true):
       write('NXP_BOOT2', true):
+      write('NXP_BOOT3', true):
       delay(20):
       float('NXP_BOOT'):
       float('NXP_BOOT2'):
+      float('NXP_BOOT3'):
       input('TXD'):
       delay(10):
       hi'NXP_RESET':

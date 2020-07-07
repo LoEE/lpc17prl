@@ -268,6 +268,12 @@ local function main ()
   if opts.interactive then
     isp.uart:setup(opts.baudrate)
     if opts.customcode then
+      os.program_path = os.dirname(os.realpath(opts.customcode))
+      local function addtoPATH(p)
+        package.path = p..'/?.luac;'..p..'/?/init.luac;'..p..'/?.lua;'..p..'/?/init.lua;'..package.path
+        package.cpath = p..'/?.so;'..package.cpath
+      end
+      addtoPATH(os.program_path)
       local code, err = loadfile(opts.customcode)
       if not code then D.red'customcode error:'(D.unq(err)) os.exit(2) end
       repl.execute(code)

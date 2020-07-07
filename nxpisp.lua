@@ -62,25 +62,40 @@ function NXPisp.disconnect (self)
   self.gpio:seq():
     float'NXP_BOOT':
     float'NXP_BOOT2':
-    delay(10):
-    float'NXP_RESET':
     input'TXD':
     lo'LED':
+    delay(10):
+    float'NXP_RESET':
     run()
   if self.verbose > 0 then D.blue'÷ disconnected'() end
 end
 
 function NXPisp.reset (self, bootloader)
   if self.verbose > 0 then D.blue('÷ reset, running '..(bootloader and 'bootloader' or 'user code'))() end
-  self.gpio:seq():
-    lo'NXP_RESET':
-    delay(20):
-    write('NXP_BOOT', not bootloader):
-    write('NXP_BOOT2', not bootloader):
-    delay(20):
-    hi'NXP_RESET':
-    delay(20):
-    run()
+  if bootloader then
+    self.gpio:seq():
+      lo'NXP_RESET':
+      delay(20):
+      write('NXP_BOOT', false):
+      write('NXP_BOOT2', false):
+      delay(20):
+      hi'NXP_RESET':
+      delay(20):
+      run()
+  else
+    self.gpio:seq():
+      lo'NXP_RESET':
+      delay(20):
+      write('NXP_BOOT', true):
+      write('NXP_BOOT2', true):
+      delay(20):
+      float('NXP_BOOT'):
+      float('NXP_BOOT2'):
+      input('TXD'):
+      delay(10):
+      hi'NXP_RESET':
+      run()
+  end
 end
 
 
